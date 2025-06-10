@@ -25,8 +25,8 @@ export const planets = [
 		size: 1.0,
 		material: (uniforms: UniT) => planet1Material(uniforms),
 		withRing: true,
-		ringMaterial: (uniforms: UniT) => p1RingMaterial(uniforms),
-		speed: 0.008,
+		ringMaterial: () => p1RingMaterial(),
+		speed: 0.005,
 		project: {
 			name: 'Project Venus',
 			description: 'Beautiful UI component library.',
@@ -39,7 +39,7 @@ export const planets = [
 		size: 1.3,
 		material: (uniforms: UniT) => material(uniforms),
 		withRing: false,
-		speed: 0.006,
+		speed: 0.0045,
 		project: {
 			name: 'Project Earth',
 			description: 'Full-stack web platform.',
@@ -52,7 +52,7 @@ export const planets = [
 		size: 0.9,
 		material: (uniforms: UniT) => material(uniforms),
 		withRing: false,
-		speed: 0.004,
+		speed: 0.0025,
 		project: {
 			name: 'Project Mars',
 			description: 'AI-powered data analysis tool.',

@@ -53,10 +53,10 @@ const planet1Material = (uniforms: UniformsType) => new THREE.ShaderMaterial({
 	uniforms,
 });
 
-const p1RingMaterial = (uniforms: UniformsType) => new THREE.ShaderMaterial({
+const p1RingMaterial = () => new THREE.ShaderMaterial({
 	vertexShader: p1RingVertexShader,
 	fragmentShader: p1RingFragmentShader,
-	uniforms: uniforms,
+	// uniforms: uniforms,
 	transparent: true,
 	side: THREE.DoubleSide,
 });

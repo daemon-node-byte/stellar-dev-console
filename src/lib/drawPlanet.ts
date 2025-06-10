@@ -13,7 +13,7 @@ function generatePlanetObject(data: { size: number, radius: number }, material: 
 }
 
 function generatePlanetRing(size: number, material: THREE.Material) {
-	const geo = new THREE.RingGeometry(size + 0.1, size * 1.2, 128);
+	const geo = new THREE.RingGeometry(size + 1, size * 1.3, 64);
 	geo.rotateX(-Math.PI / 2);
 	return createMesh(geo, material);
 }
