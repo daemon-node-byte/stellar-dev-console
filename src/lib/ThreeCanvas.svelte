@@ -8,8 +8,10 @@
 	import { createMesh } from '$lib/createMesh';
 	import { createSceneSpace } from '$lib/createSceneSpace';
 	import { drawStarfield } from '$lib/drawStarfield';
+	import { drawPlanet } from '$lib/drawPlanet';
+	import { planets as newPlanetData } from '$lib/planets';
 	import Terminal from '$lib/Terminal.svelte';
-	import { settings } from '$lib/config';
+
 	import {
 		createSun3dObject,
 		createSunGlow,
@@ -17,13 +19,11 @@
 		updatePlasmaArcs
 	} from '$lib/createSun3dObject';
 	import {
-		material,
 		sunMaterial,
 		sunGlowMaterial,
 		flareMaterial
 	} from '$lib/materials';
 
-	const { planets: orbitData } = settings.solarSystem;
 	const dispatch = createEventDispatcher();
 
 	let container: HTMLDivElement;
@@ -66,7 +66,7 @@
 			uTime: { value: 0.0 },
 			uLightPos: { value: new THREE.Vector3(0, 0, 0) }
 		};
-		const planetMaterial = material(uniforms);
+		// const planetMaterial = material(uniforms);
 		const sunUniformsObj = { uTime: { value: 0 } };
 		const sunShaderMaterial = sunMaterial(sunUniformsObj);
 		const sunGlowShaderMaterial = sunGlowMaterial();
@@ -81,46 +81,16 @@
 		createSolarFlares(sunSize, flareShaderMaterial, scene);
 		sunMesh.add(plasmaGroup);
 
-		// Planet data
-		const planetData = [
-			{ radius: 6, size: 0.7, color: 0x33ccff, speed: 0.003, name: 'About' },
-			{ radius: 10, size: 1.0, color: 0xff3366, speed: 0.008, name: 'Blog' },
-			{ radius: 14, size: 1.3, color: 0x66ff66, speed: 0.006, name: 'Projects' },
-			{ radius: 18, size: 0.9, color: 0xffff66, speed: 0.004, name: 'Contact' }
-		];
 
-		// Project details
-		const projects = [
-			{ name: 'Project Mercury', description: 'A blazing fast API server.', color: 0x33ccff },
-			{ name: 'Project Venus', description: 'Beautiful UI component library.', color: 0xff3366 },
-			{ name: 'Project Earth', description: 'Full-stack web platform.', color: 0x66ff66 },
-			{ name: 'Project Mars', description: 'AI-powered data analysis tool.', color: 0xffff66 }
-		];
-
-		// Create planets
-		const planets = planetData.map((data, i) => {
-			const parent = new THREE.Object3D();
-			parent.position.set(data.radius, 0, 0);
-			scene.add(parent);
-
-			const geo = new THREE.SphereGeometry(data.size, 32, 32);
-			const mesh = createMesh(geo, planetMaterial);
-			mesh.userData = {
-				name: data.name,
-				...projects[i],
-				id: i
-			};
-			parent.add(mesh);
-
+		const planets = newPlanetData.map((data) => {
+			const planet = drawPlanet(scene, data.withRing, data.material(uniforms), {size: data.size, radius: data.radius}, data.withRing && data.ringMaterial ? data.ringMaterial(uniforms) : undefined);
 			return {
-				name: data.name,
-				parent,
-				mesh,
+				...data,
 				angle: Math.random() * Math.PI * 2,
-				radius: data.radius,
-				speed: data.speed
-			};
-		});
+				parent: planet.parent,
+				mesh: planet.mesh,
+			}
+		})
 
 		// Setup raycaster for interaction
 		const raycaster = new THREE.Raycaster();

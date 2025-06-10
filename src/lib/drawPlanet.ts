@@ -8,8 +8,8 @@ function generatePlanetObject(data: { size: number, radius: number }, material: 
 	const geo = new THREE.SphereGeometry(size, 32, 32);
 	const mesh = createMesh(geo, material);
 	mesh.userData = { ...data }
-	parent.add(mesh)
-	return parent;
+
+	return { parent, mesh };
 }
 
 function generatePlanetRing(size: number, material: THREE.Material) {
@@ -23,14 +23,16 @@ function drawPlanet(
 	withRing: boolean,
 	planetMat: THREE.Material,
 	data : { size: number; radius: number },
-	ringMat?: THREE.Material,
+	ringMaterial?: THREE.Material,
 ) {
-	const planet = generatePlanetObject(data, planetMat);
-	if (withRing && ringMat) {
-		const ring = generatePlanetRing(data.size, ringMat);
-		planet.add(ring);
+	const { parent, mesh } = generatePlanetObject(data, planetMat);
+	parent.add(mesh)
+	if (withRing && ringMaterial) {
+		const ring = generatePlanetRing(data.size, ringMaterial);
+		parent.add(ring);
 	}
-	scene.add(planet);
+	scene.add(parent);
+	return { parent, mesh };
 }
 
 export { drawPlanet, generatePlanetObject, generatePlanetRing };
