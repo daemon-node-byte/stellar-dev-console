@@ -53,12 +53,15 @@
 		const { scene: createdScene, renderer, camera } = createSceneSpace(container);
 		scene = createdScene;
 
+		 // Optimize renderer
+		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
 		// Setup post-processing
 		const composer = new EffectComposer(renderer);
 		composer.addPass(new RenderPass(scene, camera));
 		composer.addPass(new UnrealBloomPass(
 			new THREE.Vector2(window.innerWidth, window.innerHeight),
-			1.2, 0.2, 0.35
+			0.7, 0.15, 0.25 // Lower bloom strength and radius
 		));
 
 		// Setup materials
@@ -66,7 +69,6 @@
 			uTime: { value: 0.0 },
 			uLightPos: { value: new THREE.Vector3(0, 0, 0) }
 		};
-		// const planetMaterial = material(uniforms);
 		const sunUniformsObj = { uTime: { value: 0 } };
 		const sunShaderMaterial = sunMaterial(sunUniformsObj);
 		const sunGlowShaderMaterial = sunGlowMaterial();
@@ -76,11 +78,10 @@
 		drawStarfield(scene);
 
 		// Create sun
-		const { mesh: sunMesh, plasmaGroup } = createSun3dObject(sunSize, sunShaderMaterial, scene);
-		createSunGlow(sunSize, sunGlowShaderMaterial, scene, sunMesh);
-		createSolarFlares(sunSize, flareShaderMaterial, scene);
+		const { mesh: sunMesh, plasmaGroup } = createSun3dObject(sunSize, sunShaderMaterial, scene, 16, 16);
+		createSunGlow(sunSize, sunGlowShaderMaterial, scene, sunMesh, 16, 16);
+		createSolarFlares(sunSize, flareShaderMaterial, scene, 32);
 		sunMesh.add(plasmaGroup);
-
 
 		const planets = newPlanetData.map((data) => {
 			const planet = drawPlanet(scene, data.withRing, data.material(uniforms), {size: data.size, radius: data.radius}, data.withRing && data.ringMaterial ? data.ringMaterial(uniforms) : undefined);
@@ -128,6 +129,8 @@
 
 		let prevTime = performance.now();
 
+		let prevLabelScreens: typeof labelScreens = [];
+
 		// Animation loop
 		const animate = () => {
 			const currentTime = performance.now();
@@ -163,8 +166,8 @@
 				camera.lookAt(new THREE.Vector3(0, 0, 0));
 			}
 
-			// Update planet labels
-			labelScreens = planets.map(({ name, parent }) => {
+			// Update planet labels only if camera or planet positions changed
+			const newLabels = planets.map(({ name, parent }) => {
 				const screenPos = parent.position.clone();
 				screenPos.y = 1;
 				screenPos.project(camera);
@@ -175,6 +178,10 @@
 					visible: screenPos.z < 1
 				};
 			});
+			if (JSON.stringify(newLabels) !== JSON.stringify(prevLabelScreens)) {
+				labelScreens = newLabels;
+				prevLabelScreens = newLabels;
+			}
 
 			composer.render(scene, camera);
 			requestAnimationFrame(animate);
@@ -182,11 +189,15 @@
 
 		animate();
 
-		// Handle window events
+		// Debounced resize handler
+		let resizeTimeout: ReturnType<typeof setTimeout>;
 		const handleResize = () => {
-			camera.aspect = container.clientWidth / container.clientHeight;
-			camera.updateProjectionMatrix();
-			renderer.setSize(container.clientWidth, container.clientHeight);
+			clearTimeout(resizeTimeout);
+			resizeTimeout = setTimeout(() => {
+				camera.aspect = container.clientWidth / container.clientHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(container.clientWidth, container.clientHeight);
+			}, 100);
 		};
 
 		window.addEventListener('keydown', (e) => {

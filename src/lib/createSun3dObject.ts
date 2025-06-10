@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { createMesh } from '$lib/createMesh';
 
-function createPlasmaArc(radius = 1.05, height = 0.3, angle = 0) {
-	const arcSegments = 20;
+function createPlasmaArc(radius = 1.05, height = 0.3, angle = 0, arcSegments = 12, tubeSegments = 24) {
 	const arcAngleSpan = Math.PI / 4;
 	const arcPoints = Array.from({ length: arcSegments + 1 }, (_, i) => {
 		const t = i / arcSegments;
@@ -15,7 +14,7 @@ function createPlasmaArc(radius = 1.05, height = 0.3, angle = 0) {
 	});
 
 	const curve = new THREE.CatmullRomCurve3(arcPoints);
-	const geometry = new THREE.TubeGeometry(curve, 64, 0.01, 8, false);
+	const geometry = new THREE.TubeGeometry(curve, tubeSegments, 0.01, 6, false);
 	const material = new THREE.MeshBasicMaterial({
 		color: new THREE.Color(1.0, 0.4, 0.1),
 		transparent: true,
@@ -25,14 +24,20 @@ function createPlasmaArc(radius = 1.05, height = 0.3, angle = 0) {
 	return new THREE.Mesh(geometry, material);
 }
 
-function createSun3dObject(size: number, material: THREE.ShaderMaterial, scene: THREE.Scene) {
-	const mesh = createMesh(new THREE.SphereGeometry(size, 32, 32), material);
+function createSun3dObject(
+	size: number,
+	material: THREE.ShaderMaterial,
+	scene: THREE.Scene,
+	widthSegments = 16,
+	heightSegments = 16
+) {
+	const mesh = createMesh(new THREE.SphereGeometry(size, widthSegments, heightSegments), material);
 	mesh.position.set(0, 0, 0);
 
 	const plasmaGroup = new THREE.Group();
 	for (let i = 0; i < 6; i++) {
 		const angle = (i / 6) * Math.PI * 2;
-		const arcMesh = createPlasmaArc(2.55, 2, angle);
+		const arcMesh = createPlasmaArc(2.55, 2, angle, 10, 16);
 		arcMesh.rotation.set(
 			Math.random() * Math.PI * 2,
 			Math.random() * Math.PI * 2,
@@ -45,15 +50,27 @@ function createSun3dObject(size: number, material: THREE.ShaderMaterial, scene: 
 	return { mesh, scene, plasmaGroup };
 }
 
-function createSunGlow(size: number, material: THREE.ShaderMaterial, scene: THREE.Scene, rootPlanet: THREE.Mesh) {
-	const mesh = createMesh(new THREE.SphereGeometry(size + 0.6, 32, 32), material);
+function createSunGlow(
+	size: number,
+	material: THREE.ShaderMaterial,
+	scene: THREE.Scene,
+	rootPlanet: THREE.Mesh,
+	widthSegments = 16,
+	heightSegments = 16
+) {
+	const mesh = createMesh(new THREE.SphereGeometry(size + 0.6, widthSegments, heightSegments), material);
 	mesh.position.copy(rootPlanet.position);
 	scene.add(mesh);
 	return { mesh, scene };
 }
 
-function createSolarFlares(size: number, material: THREE.ShaderMaterial, scene: THREE.Scene) {
-	const geo = new THREE.RingGeometry(size + 0.4, size + 0.6, 64);
+function createSolarFlares(
+	size: number,
+	material: THREE.ShaderMaterial,
+	scene: THREE.Scene,
+	segments = 32
+) {
+	const geo = new THREE.RingGeometry(size + 0.4, size + 0.6, segments);
 	geo.rotateX(Math.PI / 2);
 	const mesh = new THREE.Mesh(geo, material);
 	scene.add(mesh);
