@@ -43,12 +43,27 @@
 		terminalOpen = !terminalOpen;
 	}
 
+	// Move planets declaration here so it's accessible in markup
+	let planets: {
+		name: string;
+		angle: number;
+		parent: THREE.Object3D;
+		mesh: THREE.Mesh;
+		speed: number;
+		radius: number;
+		withRing?: boolean;
+		material: THREE.Material;
+		size: number;
+		ringMaterial?: THREE.Material;
+	}[] = [];
+
 	onMount(() => {
 		const sunSize = 2.2;
 		let targetCameraPos = new THREE.Vector3();
 		const defaultCameraPos = new THREE.Vector3(0, 12, 30);
 		let selectedPlanet: THREE.Mesh | null = null;
 		let glowMesh: THREE.Mesh | null = null;
+		let selectedPlanetData: typeof planets[0] | null = null;
 
 		const { scene: createdScene, renderer, camera } = createSceneSpace(container);
 		scene = createdScene;
@@ -83,45 +98,60 @@
 		createSolarFlares(sunSize, flareShaderMaterial, scene, 32);
 		sunMesh.add(plasmaGroup);
 
-		const planets = newPlanetData.map((data) => {
-			const planet = drawPlanet(scene, data.withRing, data.material(uniforms), {size: data.size, radius: data.radius}, data.withRing && data.ringMaterial ? data.ringMaterial(uniforms) : undefined);
+		// Assign to outer planets variable
+		planets = newPlanetData.map((data) => {
+			const planet = drawPlanet(scene, data.withRing, data.material(uniforms), {size: data.size, radius: data.radius}, data.withRing && data.ringMaterial ? data.ringMaterial() : undefined);
 			return {
 				...data,
 				angle: Math.random() * Math.PI * 2,
 				parent: planet.parent,
 				mesh: planet.mesh,
 			}
-		})
+		});
 
 		// Setup raycaster for interaction
 		const raycaster = new THREE.Raycaster();
 		const mouse = new THREE.Vector2();
 
-		// Handle planet selection
+		// Handle planet selection by mesh or label
+		function selectPlanetByMesh(mesh: THREE.Mesh | null) {
+			if (glowMesh) scene.remove(glowMesh);
+
+			if (mesh) {
+				selectedPlanet = mesh;
+				selectedPlanetData = planets.find(p => p.mesh === mesh) || null;
+				dispatch('select', selectedPlanet.userData);
+				// Always compute the latest position for the camera to follow the planet
+				const planetPos = selectedPlanetData?.parent.position.clone() || mesh.position.clone();
+				targetCameraPos = planetPos.clone().add(new THREE.Vector3(0, 2, 5));
+
+				// Add glow effect
+				const geometry = (mesh.geometry as THREE.SphereGeometry).clone();
+				glowMesh = createMesh(geometry, createGlowMaterial());
+				glowMesh.scale.set(1.2, 1.2, 1.2);
+				glowMesh.position.copy(planetPos);
+				scene.add(glowMesh);
+			} else {
+				selectedPlanet = null;
+				selectedPlanetData = null;
+				targetCameraPos = defaultCameraPos.clone();
+			}
+		}
+
 		const onClick = (event: MouseEvent) => {
 			const rect = container.getBoundingClientRect();
 			mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
 			mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
 			raycaster.setFromCamera(mouse, camera);
-			const intersects = raycaster.intersectObjects(planets.map(p => p.mesh));
 
-			if (glowMesh) scene.remove(glowMesh);
+			const planetMeshes = planets.map(p => p.mesh);
+			const intersects = raycaster.intersectObjects(planetMeshes);
 
 			if (intersects.length > 0) {
-				selectedPlanet = intersects[0].object as THREE.Mesh;
-				dispatch('select', selectedPlanet.userData);
-				targetCameraPos = selectedPlanet.position.clone().add(new THREE.Vector3(0, 2, 5));
-
-				// Add glow effect
-				const geometry = (selectedPlanet.geometry as THREE.SphereGeometry).clone();
-				glowMesh = createMesh(geometry, createGlowMaterial());
-				glowMesh.scale.set(1.2, 1.2, 1.2);
-				glowMesh.position.copy(selectedPlanet.position);
-				scene.add(glowMesh);
+				selectPlanetByMesh(intersects[0].object as THREE.Mesh);
 			} else {
-				selectedPlanet = null;
-				targetCameraPos = defaultCameraPos.clone();
+				selectPlanetByMesh(null);
 			}
 		};
 
@@ -151,14 +181,16 @@
 				planet.mesh.rotation.y += delta * 0.1;
 			});
 
-			// Update camera
-			if (selectedPlanet) {
-				camera.position.lerp(targetCameraPos, 0.05);
-				camera.lookAt(selectedPlanet.position);
+			// Update camera to follow the selected planet as it moves
+			if (selectedPlanet && selectedPlanetData) {
+				const planetPos = selectedPlanetData.parent.position.clone();
+				const desiredCameraPos = planetPos.clone().add(new THREE.Vector3(0, 2, 5));
+				camera.position.lerp(desiredCameraPos, 0.05);
+				camera.lookAt(planetPos);
 
 				if (glowMesh) {
-					glowMesh.position.copy(selectedPlanet.position);
-					const viewVector = new THREE.Vector3().subVectors(camera.position, selectedPlanet.position);
+					glowMesh.position.copy(planetPos);
+					const viewVector = new THREE.Vector3().subVectors(camera.position, planetPos);
 					(glowMesh.material as THREE.ShaderMaterial).uniforms.viewVector.value = viewVector;
 				}
 			} else {
@@ -202,8 +234,7 @@
 
 		window.addEventListener('keydown', (e) => {
 			if (e.key === 'Escape') {
-				selectedPlanet = null;
-				targetCameraPos = defaultCameraPos.clone();
+				selectPlanetByMesh(null);
 			}
 		});
 
@@ -222,17 +253,23 @@
 <Terminal lines={terminalLines} isOpen={terminalOpen} />
 {#each labelScreens as label (label.name)}
 	{#if label.visible}
-		<div
-			class="label"
+		<button
+			type="button"
+			class="label-btn"
+			aria-label="Select planet {label.name}"
 			style="
-        position: absolute;
-        left: {label.x}px;
-        top: {label.y}px;
-        transform: translate(-50%, -50%);
-      "
+				position: absolute;
+				left: {label.x}px;
+				top: {label.y}px;
+				transform: translate(-50%, -50%);
+			"
+			on:click={() => {
+				const planet = planets.find(p => p.name === label.name);
+				if (planet) selectPlanetByMesh(planet.mesh);
+			}}
 		>
 			{label.name}
-		</div>
+		</button>
 	{/if}
 {/each}
 
@@ -247,7 +284,7 @@
         overflow: hidden;
         z-index: 0;
     }
-    .label {
+    .label-btn {
         font-family: 'Orbitron', sans-serif;
         font-size: 14px;
         white-space: nowrap;
@@ -255,8 +292,16 @@
         color: white;
         font-weight: bold;
         text-shadow: 0 0 5px #00ffff;
-        pointer-events: none;
         z-index: 99999;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+        outline: none;
+    }
+    .label-btn:focus {
+        outline: 2px solid cyan;
     }
     .terminal-toggle {
         position: fixed;
